@@ -26,39 +26,50 @@ export function CameraCapture({
 
   const startCamera = async () => {
     setError(null);
+    setIsCapturing(true);
+    
     try {
+      console.log("Requesting camera access...");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-             facingMode: { ideal: 'environment' },
+          facingMode: "environment",
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
         audio: type === "video",
       });
 
+      console.log("Camera stream obtained:", stream.getVideoTracks());
+      streamRef.current = stream;
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        streamRef.current = stream;
+        
+        // Force video to load and play
+        videoRef.current.onloadedmetadata = () => {
+          console.log(
+            'Video metadata loaded:',
+            videoRef.current?.videoWidth,
+            videoRef.current?.videoHeight,
+            'readyState:', videoRef.current?.readyState
+          );
+        };
 
-        // Ensure video plays
+        // Play the video
         try {
-          videoRef.current.onloadedmetadata = () => {
-
-              console.log(
-      'Camera ready:',
-      videoRef.current?.videoWidth,
-      videoRef.current?.videoHeight
-    );
-    
-            videoRef.current?.play();
-          };
+          await videoRef.current.play();
+          console.log("Video playing successfully");
         } catch (playError) {
           console.error("Video play error:", playError);
+          // Try to play again after a short delay
+          setTimeout(() => {
+            videoRef.current?.play().catch(e => console.error("Retry play failed:", e));
+          }, 100);
         }
       }
-      setIsCapturing(true);
     } catch (error: any) {
       console.error("Camera access error:", error);
+      setIsCapturing(false);
 
       // Provide user-friendly error messages
       if (error.name === "NotAllowedError") {
@@ -212,15 +223,16 @@ export function CameraCapture({
         )}
 
         {isCapturing && (
-          <div className="space-y-2">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted={type === "photo"}
-              className="w-full h-[300px] rounded-lg bg-black"
-              style={{ objectFit: "cover" }}
-            />
+          <div className="space-y-3">
+            <div className="w-full aspect-video rounded-lg bg-black overflow-hidden">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+            </div>
 
             <div className="flex gap-2">
               {type === "photo" ? (
@@ -260,15 +272,15 @@ export function CameraCapture({
         )}
 
         {previewUrl && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {type === "photo" ? (
               <img
                 src={previewUrl}
                 alt="Preview"
-                className="w-full rounded-lg"
+                className="w-full rounded-lg max-h-[400px] object-contain"
               />
             ) : (
-              <video src={previewUrl} controls className="w-full rounded-lg" />
+              <video src={previewUrl} controls className="w-full rounded-lg max-h-[400px]" />
             )}
             <Button onClick={retake} variant="outline" className="w-full">
               <RotateCcw className="w-4 h-4 mr-2" />
